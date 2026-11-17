@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0b1120" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="manifest.json" />
+  <title>Equity Call Radar — Dhan Live</title>
+  <style>
+    :root {
+      --bg: #0b1120;
+      --card: #111827;
+      --card-border: #1f2937;
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+      --green: #10b981;
+      --green-bg: rgba(16, 185, 129, 0.14);
+      --red: #ef4444;
+      --red-bg: rgba(239, 68, 68, 0.14);
+      --amber: #f59e0b;
+      --amber-bg: rgba(245, 158, 11, 0.14);
+      --blue: #3b82f6;
+      --blue-bg: rgba(59, 130, 246, 0.14);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding-bottom: 90px; -webkit-tap-highlight-color: transparent; }
+
+    header {
+      position: sticky; top: 0; z-index: 20;
+      background: rgba(11, 17, 32, 0.96); backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--card-border); padding: 12px 16px;
+    }
+    .top-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    h1 { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.02em; display: flex; align-items: center; gap: 6px; }
+    .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); display: inline-block; box-shadow: 0 0 8px var(--green); }
+    .live-dot.paused { background: var(--muted); box-shadow: none; }
+    .subtitle { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+    .header-actions { display: flex; gap: 6px; align-items: center; }
+
+    .btn {
+      border: none; border-radius: 8px; padding: 7px 10px; font-size: 0.75rem;
+      font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .btn-primary { background: var(--blue); color: #fff; }
+    .btn-ghost { background: var(--card); color: var(--text); border: 1px solid var(--card-border); }
+    .btn-live.active { background: var(--green-bg); color: var(--green); border-color: var(--green); }
+    .btn-danger { background: var(--red-bg); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+    .btn-success { background: var(--green-bg); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
+
+    #alertBanner {
+      background: var(--amber-bg); border-bottom: 1px solid rgba(245, 158, 11, 0.3);
+      padding: 9px 16px; display: flex; justify-content: space-between; align-items: center;
+      font-size: 0.78rem; color: #fcd34d;
+    }
+    #alertBanner.hidden { display: none; }
+
+    .controls { padding: 12px 16px 4px; display: flex; flex-direction: column; gap: 10px; }
+    .search-row { display: flex; gap: 8px; }
+    input[type="text"], input[type="number"], select, textarea {
+      background: var(--card); border: 1px solid var(--card-border); color: var(--text);
+      border-radius: 10px; padding: 9px 12px; font-size: 0.86rem; outline: none;
+    }
+    input[type="text"] { flex: 1; }
+    .threshold-box { display: flex; align-items: center; gap: 4px; background: var(--card); border: 1px solid var(--card-border); border-radius: 10px; padding: 0 8px; font-size: 0.75rem; color: var(--muted); }
+    .threshold-box input { width: 42px; border: none; padding: 8px 2px; text-align: center; font-weight: 700; color: var(--amber); }
+
+    .pills { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
+    .pills::-webkit-scrollbar { display: none; }
+    .pill {
+      white-space: nowrap; padding: 6px 12px; border-radius: 999px; font-size: 0.75rem;
+      font-weight: 600; background: var(--card); color: var(--muted); border: 1px solid var(--card-border); cursor: pointer;
+    }
+    .pill.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+    .pill.pill-target.active { background: var(--green); color: #052e16; border-color: var(--green); }
+    .pill.pill-sl.active { background: var(--red); color: #fff; border-color: var(--red); }
+
+    .alerts-log { margin: 8px 16px; background: var(--card); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px 12px; }
+    .alerts-log-header { display: flex; justify-content: space-between; font-size: 0.78rem; font-weight: 700; color: var(--amber); margin-bottom: 6px; }
+    .alert-item { font-size: 0.76rem; padding: 5px 0; border-top: 1px solid var(--card-border); display: flex; justify-content: space-between; gap: 8px; }
+    .alert-item:first-child { border-top: none; }
+
+    .list { padding: 8px 16px; display: flex; flex-direction: column; gap: 12px; }
+    .card {
+      background: var(--card); border: 1px solid var(--card-border); border-radius: 14px;
+      padding: 14px; position: relative; transition: border-color 0.2s;
+    }
+    .card.near-target { border-color: var(--green); box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.25); }
+    .card.near-sl { border-color: var(--red); box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.25); }
+    .card.near-dip { border-color: var(--blue); }
+    .card.closed { opacity: 0.65; border-color: #374151; }
+
+    .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
+    .stock-name { font-size: 1rem; font-weight: 700; }
+    .ticker-tag { font-size: 0.68rem; color: var(--blue); background: var(--blue-bg); padding: 1px 6px; border-radius: 4px; margin-left: 5px; font-weight: 600; }
+    .stock-meta { font-size: 0.71rem; color: var(--muted); margin-top: 3px; }
+
+    .badge {
+      font-size: 0.68rem; font-weight: 700; padding: 3px 8px; border-radius: 6px;
+      text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap;
+    }
+    .badge-target { background: var(--green-bg); color: var(--green); }
+    .badge-sl { background: var(--red-bg); color: var(--red); }
+    .badge-dip { background: var(--blue-bg); color: var(--blue); }
+    .badge-closed { background: #374151; color: #d1d5db; }
+
+    .price-bar {
+      display: flex; justify-content: space-between; align-items: center;
+      background: rgba(0, 0, 0, 0.28); padding: 8px 10px; border-radius: 10px; margin-bottom: 10px;
+    }
+    .cmp-group { display: flex; align-items: center; gap: 6px; }
+    .cmp-label { font-size: 0.72rem; color: var(--muted); }
+    .cmp-input {
+      width: 90px; padding: 5px 8px; font-size: 0.92rem; font-weight: 700;
+      background: #1f2937; border: 1px solid #374151; border-radius: 7px; color: #fff;
+    }
+    .live-tag { font-size: 0.65rem; padding: 2px 5px; border-radius: 4px; background: var(--green-bg); color: var(--green); font-weight: 700; }
+    .live-tag.stale { background: rgba(156,163,175,0.15); color: var(--muted); }
+    .pnl { font-size: 0.8rem; font-weight: 700; text-align: right; }
+    .pnl.pos { color: var(--green); }
+    .pnl.neg { color: var(--red); }
+
+    .levels { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; text-align: center; }
+    .lvl-box { background: rgba(255,255,255,0.03); padding: 6px 4px; border-radius: 8px; }
+    .lvl-lbl { font-size: 0.65rem; color: var(--muted); display: block; }
+    .lvl-val { font-size: 0.8rem; font-weight: 700; margin-top: 2px; display: block; }
+    .c-sl { color: var(--red); }
+    .c-t1, .c-t2 { color: var(--green); }
+
+    .range-wrap { margin-bottom: 8px; }
+    .range-track { height: 6px; background: #1f2937; border-radius: 999px; position: relative; overflow: hidden; }
+    .range-fill { height: 100%; border-radius: 999px; transition: width 0.3s ease, background 0.3s ease; }
+    .range-labels { display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--muted); margin-top: 3px; }
+
+    .status-note { font-size: 0.75rem; color: #d1d5db; line-height: 1.35; background: rgba(255,255,255,0.02); padding: 7px 9px; border-radius: 8px; margin-bottom: 8px; }
+    .card-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .sync-time { font-size: 0.66rem; color: var(--muted); }
+    .card-actions { display: flex; gap: 6px; align-items: center; }
+    .mini-btn { background: transparent; border: 1px solid var(--card-border); color: var(--muted); border-radius: 6px; padding: 5px 9px; font-size: 0.72rem; cursor: pointer; font-weight: 600; }
+    .mini-btn.close-action { background: var(--red-bg); color: var(--red); border-color: rgba(239,68,68,0.3); }
+    .mini-btn.reopen-action { background: var(--green-bg); color: var(--green); border-color: rgba(16,185,129,0.3); }
+
+    .fab {
+      position: fixed; bottom: 20px; right: 20px; z-index: 30;
+      background: var(--blue); color: #fff; border: none; border-radius: 999px;
+      padding: 13px 18px; font-size: 0.9rem; font-weight: 700;
+      box-shadow: 0 8px 24px rgba(59, 130, 246, 0.45); cursor: pointer;
+    }
+
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.78); z-index: 50;
+      display: flex; align-items: flex-end; justify-content: center;
+    }
+    .modal-backdrop.hidden { display: none; }
+    .modal {
+      background: var(--card); width: 100%; max-width: 520px; border-radius: 18px 18px 0 0;
+      padding: 18px; border-top: 1px solid var(--card-border); max-height: 90vh; overflow-y: auto;
+    }
+    .modal h2 { font-size: 1.02rem; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .form-grid input, .form-grid select { width: 100%; }
+    .field-lbl { font-size: 0.7rem; color: var(--muted); margin-bottom: 3px; display: block; }
+    .modal-actions { display: flex; gap: 8px; justify-content: space-between; align-items: center; }
+    .backup-box { background: rgba(255,255,255,0.03); padding: 12px; border-radius: 10px; margin-bottom: 12px; }
+    .backup-box p { font-size: 0.78rem; color: var(--muted); margin-bottom: 8px; line-height: 1.4; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="top-row">
+      <div>
+        <h1><span id="liveDot" class="live-dot"></span> Equity Radar — Dhan</h1>
+        <div class="subtitle" id="summarySubtitle">Connecting to Dhan API...</div>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-ghost" onclick="refreshDhanPrices(true)" title="Fetch Live Dhan Prices">🔄 Refresh</button>
+        <button id="autoPollBtn" class="btn btn-ghost btn-live active" onclick="toggleAutoPoll()">● Auto 30s</button>
+        <button class="btn btn-ghost" onclick="openSettingsModal()" title="Dhan Credentials & Backup">⚙️</button>
+      </div>
+    </div>
+  </header>
+
+  <div id="alertBanner">
+    <span>🔔 Enable Android notifications & sound alerts</span>
+    <button class="btn btn-primary" onclick="requestAlertPermissions()">Enable</button>
+  </div>
+
+  <div class="controls">
+    <div class="search-row">
+      <input type="text" id="searchInput" placeholder="Search stock or security ID..." oninput="render()" />
+      <div class="threshold-box" title="Alert when within X% of Target or Stop Loss">
+        <span>Alert</span>
+        <input type="number" id="thresholdInput" value="3" min="0.5" max="15" step="0.5" onchange="updateThreshold()" />
+        <span>%</span>
+      </div>
+    </div>
+
+    <div class="pills">
+      <button class="pill active" data-filter="active" onclick="setFilter('active', this)">Active (<span id="cntActive">0</span>)</button>
+      <button class="pill pill-target" data-filter="near_target" onclick="setFilter('near_target', this)">🎯 Near Target (<span id="cntTarget">0</span>)</button>
+      <button class="pill pill-sl" data-filter="near_sl" onclick="setFilter('near_sl', this)">🛑 Near SL (<span id="cntSl">0</span>)</button>
+      <button class="pill" data-filter="near_dip" onclick="setFilter('near_dip', this)">📉 Dip Zone (<span id="cntDip">0</span>)</button>
+      <button class="pill" data-filter="closed" onclick="setFilter('closed', this)">Closed (<span id="cntClosed">0</span>)</button>
+      <button class="pill" data-filter="all" onclick="setFilter('all', this)">All (<span id="cntAll">0</span>)</button>
+    </div>
+  </div>
+
+  <div id="alertsDrawer" class="alerts-log" style="display:none;">
+    <div class="alerts-log-header">
+      <span>⚡ TRIGGERED PROXIMITY ALERTS</span>
+      <span style="cursor:pointer; text-decoration:underline;" onclick="clearAlerts()">Clear</span>
+    </div>
+    <div id="alertsList"></div>
+  </div>
+
+  <div class="list" id="stockList"></div>
+
+  <button class="fab" onclick="openFormModal()">+ Add New Stock</button>
+
+  <!-- Add / Edit Stock Modal -->
+  <div id="formModal" class="modal-backdrop hidden">
+    <div class="modal">
+      <h2 id="formModalTitle">Add New Equity Call</h2>
+      <input type="hidden" id="editStockId" value="" />
+      <div class="form-grid">
+        <div>
+          <label class="field-lbl">Stock Name *</label>
+          <input type="text" id="fName" placeholder="e.g. Tata Motors" />
+        </div>
+        <div>
+          <label class="field-lbl">Dhan Security ID *</label>
+          <input type="text" id="fSecId" placeholder="e.g. 3456" />
+        </div>
+        <div>
+          <label class="field-lbl">Call Date</label>
+          <input type="text" id="fDate" placeholder="e.g. 20 Nov 2026" />
+        </div>
+        <div>
+          <label class="field-lbl">Status</label>
+          <select id="fClosed">
+            <option value="false">Active Call</option>
+            <option value="true">Closed / Exited</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-lbl">Entry Price (₹) *</label>
+          <input type="number" step="0.05" id="fEntry" placeholder="850" />
+        </div>
+        <div>
+          <label class="field-lbl">Current Price CMP (₹)</label>
+          <input type="number" step="0.05" id="fCmp" placeholder="Auto-fetched" />
+        </div>
+        <div>
+          <label class="field-lbl">Stop Loss (₹)</label>
+          <input type="number" step="0.05" id="fSl" placeholder="720" />
+        </div>
+        <div>
+          <label class="field-lbl">Buy on Dips Up To (₹)</label>
+          <input type="number" step="0.05" id="fDip" placeholder="800" />
+        </div>
+        <div>
+          <label class="field-lbl">Target 1 (₹)</label>
+          <input type="number" step="0.05" id="fT1" placeholder="1050" />
+        </div>
+        <div>
+          <label class="field-lbl">Target 2 (₹)</label>
+          <input type="number" step="0.05" id="fT2" placeholder="1200" />
+        </div>
+        <div>
+          <label class="field-lbl">Target 3 / Long Term (₹)</label>
+          <input type="number" step="0.05" id="fT3" placeholder="Optional" />
+        </div>
+        <div>
+          <label class="field-lbl">Horizon / Alloc</label>
+          <input type="text" id="fHorizon" placeholder="e.g. 6-9 mos" />
+        </div>
+        <div style="grid-column: span 2;">
+          <label class="field-lbl">Notes / Triggers</label>
+          <input type="text" id="fStatus" placeholder="e.g. Breakout above resistance" />
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="deleteStockBtn" class="btn btn-danger hidden" onclick="deleteStock()">Delete</button>
+        <div style="display:flex; gap:8px; margin-left:auto;">
+          <button class="btn btn-ghost" onclick="closeFormModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveStockForm()">Save Call</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings & Credentials Modal -->
+  <div id="settingsModal" class="modal-backdrop hidden">
+    <div class="modal">
+      <h2>Dhan API Credentials & Settings</h2>
+      <div class="backup-box">
+        <p>Enter your official DhanHQ API credentials. You can generate your Access Token valid for 24 hours from <a href="https://web.dhan.co" target="_blank" style="color:var(--blue)">web.dhan.co</a> under Profile -> Access DhanHQ APIs.</p>
+        <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+          <div>
+            <label class="field-lbl">Client ID</label>
+            <input type="text" id="settingClientId" placeholder="1114314980" value="1114314980" style="width:100%;" />
+          </div>
+          <div>
+            <label class="field-lbl">Access Token (JWT)</label>
+            <textarea id="settingAccessToken" rows="3" placeholder="Paste your 24-hr access token here..." style="width:100%; resize:vertical; font-size:0.75rem;"></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="saveDhanCredentials()">Save Credentials</button>
+        </div>
+      </div>
+      <div class="backup-box">
+        <p>Export or import your watchlist backup as JSON.</p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="exportBackup()">⬇ Export JSON</button>
+          <label class="btn btn-ghost" style="cursor:pointer;">
+            ⬆ Import JSON
+            <input type="file" accept=".json" style="display:none;" onchange="importBackup(event)" />
+          </label>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-danger" onclick="resetToDefault()">Reset Watchlist</button>
+        <button class="btn btn-ghost" onclick="closeSettingsModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const INITIAL_STOCKS = [
+  { id: 1, name: "Glenmark Pharma", secId: "1359", seg: "NSE_EQ", date: "3 Aug 2026", entry: 2210, cmp: 2210, dipBuy: null, sl: 1900, t1: 2700, t2: 3100, t3: null, allocation: "3% max", horizon: "8-10 mos", status: "1st target 2,700 HIT (9 Nov): book 50%, hold rest with SL at cost for 3,100", isClosed: false },
+  { id: 2, name: "Tilaknagar Industries", secId: "3485", seg: "NSE_EQ", date: "3 Aug 2026", entry: 470, cmp: 470, dipBuy: null, sl: 300, t1: 750, t2: 900, t3: null, allocation: "3% max", horizon: "10-14 mos", status: "Targets upgraded 13 Aug (was 600 / 750). 'Must hold'. Imperial Blue acquisition trigger", isClosed: false },
+  { id: 3, name: "Biocon", secId: "331", seg: "NSE_EQ", date: "3 Aug 2026", entry: 425, cmp: 425, dipBuy: 350, sl: 250, t1: 550, t2: 680, t3: 800, allocation: "3% max", horizon: "10-12 mos", status: "Portfolio pick. Triggers: HAT technical trade, Q4 beat, capex cycle over", isClosed: false },
+  { id: 4, name: "Anthem Bio", secId: "14820", seg: "NSE_EQ", date: "3 Aug 2026", entry: 820, cmp: 820, dipBuy: 750, sl: 650, t1: 1200, t2: 1400, t3: null, allocation: "3% max", horizon: "5-8 mos", status: "Targets upgraded 1 Sep (was 985 / 1,100). SL on weekly closing basis", isClosed: false },
+  { id: 5, name: "Skipper Ltd", secId: "14890", seg: "NSE_EQ", date: "3 Aug 2026", entry: 550, cmp: 550, dipBuy: null, sl: 330, t1: 700, t2: 870, t3: null, allocation: "2.5% max", horizon: "5-8 mos", status: "Moderate trade. SL on weekly closing basis", isClosed: false },
+  { id: 6, name: "APL Apollo Tubes", secId: "1449", seg: "NSE_EQ", date: "4 Aug 2026", entry: 1980, cmp: 1980, dipBuy: 1750, sl: 1400, t1: 2600, t2: 3000, t3: null, allocation: "3% max", horizon: "5-8 mos", status: "Moderate trade. Good fundamental share, keep in portfolio", isClosed: false },
+  { id: 7, name: "360ONE WAM", secId: "1898", seg: "NSE_EQ", date: "5 Aug 2026", entry: 1190, cmp: 1190, dipBuy: 1050, sl: 900, t1: 1500, t2: 1700, t3: null, allocation: "2.5-3%", horizon: "6-9 mos", status: "Technical trade: 1.5 yr consolidation, symmetrical triangle breakout", isClosed: false },
+  { id: 8, name: "IOL Chemicals (Trade 1)", secId: "1749", seg: "NSE_EQ", date: "3 Aug 2026", entry: 146, cmp: 165, dipBuy: null, sl: 120, t1: 165, t2: 185, t3: null, allocation: "-", horizon: "2-4 mos", status: "CLOSED. ~T1 165 hit: booked 50% (13% profit). Dropped 185 target on 26 Aug", isClosed: true },
+  { id: 9, name: "IOL Chemicals (Trade 2)", secId: "1749", seg: "NSE_EQ", date: "26 Aug 2026", entry: 180, cmp: 178, dipBuy: null, sl: 140, t1: 220, t2: 240, t3: null, allocation: "2% max", horizon: "2-4 mos", status: "CLOSED. T1 ~220 hit (6 Oct), book 50%. On 21 Oct SL-at-cost hit, exited at 175-180", isClosed: true },
+  { id: 10, name: "Good Luck India (Post-Bonus)", secId: "11532", seg: "NSE_EQ", date: "6 Aug 2026", entry: 483, cmp: 483, dipBuy: 416, sl: 316, t1: 616, t2: 733, t3: null, allocation: "2-2.5%", horizon: "10-15 mos", status: "Adjusted 10 Sep after 2:1 bonus. Small cap, high risk", isClosed: false },
+  { id: 11, name: "Caplin Point", secId: "4442", seg: "NSE_EQ", date: "6 Aug 2026", entry: 2580, cmp: 2580, dipBuy: 2100, sl: 1700, t1: 3150, t2: 3650, t3: 4000, allocation: "2.5% max", horizon: "8-12 mos", status: "T3 = long-term target 4,000. Risks: USFDA/regulatory, execution", isClosed: false },
+  { id: 12, name: "Phoenix Mills", secId: "2748", seg: "NSE_EQ", date: "10 Aug 2026", entry: 1950, cmp: 2150, dipBuy: 1800, sl: 1500, t1: 2600, t2: 3000, t3: null, allocation: "2.5-3%", horizon: "7-10 mos", status: "Targets upgraded (was 2,400 / 2,800). Add 0.5% more at CMP ~2,150", isClosed: false },
+  { id: 13, name: "UNO Minda", secId: "11385", seg: "NSE_EQ", date: "10 Aug 2026", entry: 1290, cmp: 1290, dipBuy: 1200, sl: 900, t1: 1550, t2: 1810, t3: null, allocation: "2.5-3%", horizon: "5-8 mos", status: "Valuation slightly expensive (~60x PE). Expects 20%+ growth", isClosed: false },
+  { id: 14, name: "Endurance Technologies", secId: "2195", seg: "NSE_EQ", date: "12 Aug 2026", entry: 3000, cmp: 3000, dipBuy: 2750, sl: 2000, t1: 3800, t2: 4500, t3: null, allocation: "2.5-3%", horizon: "8-12 mos", status: "Auto ancillary; India and Europe presence", isClosed: false },
+  { id: 15, name: "Northern Arc", secId: "22800", seg: "NSE_EQ", date: "13 Aug 2026", entry: 286, cmp: 286, dipBuy: 250, sl: 200, t1: 350, t2: 415, t3: null, allocation: "2-2.5%", horizon: "Hold", status: "Moderate trade. Tech-enabled NBFC. 'Keep hold in portfolio with patience'", isClosed: false },
+  { id: 16, name: "Hindustan Foods", secId: "19315", seg: "NSE_EQ", date: "15 Aug 2026", entry: 645, cmp: 570, dipBuy: 570, sl: 450, t1: 765, t2: 900, t3: null, allocation: "3%", horizon: "7-9 mos", status: "6 Oct: price came to dip-buying zone ~570; keep accumulating. 'Easy trade'", isClosed: false },
+  { id: 17, name: "India Glycol", secId: "1675", seg: "NSE_EQ", date: "21 Aug 2026", entry: 1150, cmp: 1150, dipBuy: 1050, sl: 850, t1: 1450, t2: 1700, t3: null, allocation: "2.5-3%", horizon: "5-8 mos", status: "Demerged: 100 IGL = 100 IGL Spirits + 33 Ennature Bio (Exited Ennature 4 Nov)", isClosed: false },
+  { id: 18, name: "LT Foods", secId: "1482", seg: "NSE_EQ", date: "24 Aug 2026", entry: 460, cmp: 460, dipBuy: null, sl: 360, t1: 560, t2: null, t3: null, allocation: "2.5-3%", horizon: "2-4 mos", status: "Short-term trade (rice stocks breaking resistance); single target only", isClosed: false },
+  { id: 19, name: "ShriRam Finance", secId: "4306", seg: "NSE_EQ", date: "27 Aug 2026", entry: 1050, cmp: 1050, dipBuy: 900, sl: 700, t1: 1300, t2: 1550, t3: null, allocation: "2.5% max", horizon: "Hold", status: "Moderate trade. Good fundamental share, keep in portfolio", isClosed: false },
+  { id: 20, name: "IFCI", secId: "1457", seg: "NSE_EQ", date: "2 Sep 2026", entry: 97.5, cmp: 67, dipBuy: null, sl: 67, t1: 126, t2: 145, t3: null, allocation: "2% max", horizon: "2-4 mos", status: "CLOSED. Stop loss hit (30 Sep): exit and book loss. Small cap, risky", isClosed: true },
+  { id: 21, name: "Gabriel India", secId: "1332", seg: "NSE_EQ", date: "17 Sep 2026", entry: 1280, cmp: 1650, dipBuy: 1100, sl: 800, t1: 1950, t2: 2450, t3: null, allocation: "2.5% max", horizon: "8-12 mos", status: "T1 1,650 hit + new ATH; targets upgraded 12 Nov (was 1,650 / 1,950). Diwali pick", isClosed: false },
+  { id: 22, name: "BHEL", secId: "438", seg: "NSE_EQ", date: "6 Oct 2026", entry: 450, cmp: 450, dipBuy: null, sl: 380, t1: 520, t2: 590, t3: null, allocation: "2.5% max", horizon: "5-7 mos", status: "14 Oct: good Q2; can still accumulate +0.5-1%", isClosed: false },
+  { id: 23, name: "Coforge", secId: "1165", seg: "NSE_EQ", date: "16 Oct 2026", entry: 1930, cmp: 1930, dipBuy: 1700, sl: 1200, t1: 2600, t2: 3000, t3: null, allocation: "2.5-3%", horizon: "10-12 mos", status: "Risks: 2 senior board members resigned, execution slowdown", isClosed: false },
+  { id: 24, name: "Minda Corp", secId: "11585", seg: "NSE_EQ", date: "22 Oct 2026", entry: 605, cmp: 605, dipBuy: 550, sl: 400, t1: 800, t2: 1000, t3: null, allocation: "3% max", horizon: "8-10 mos", status: "Buy range quoted as 610-600", isClosed: false },
+  { id: 25, name: "One97 Comm (Paytm)", secId: "13760", seg: "NSE_EQ", date: "30 Oct 2026", entry: 1690, cmp: 1690, dipBuy: 1500, sl: 1200, t1: 2100, t2: 2500, t3: null, allocation: "2.5% max", horizon: "8-10 mos", status: "Trigger: proposed MDR implementation, operating leverage", isClosed: false },
+  { id: 26, name: "MCX", secId: "3122", seg: "NSE_EQ", date: "4 Nov 2026", entry: 3300, cmp: 3300, dipBuy: 3050, sl: 2600, t1: 4000, t2: 4500, t3: null, allocation: "2.5%", horizon: "5-8 mos", status: "Volatile midcap; expect two-sided volatility", isClosed: false },
+  { id: 27, name: "Alivus Life Sciences", secId: "24800", seg: "NSE_EQ", date: "4 Nov 2026", entry: 1520, cmp: 1520, dipBuy: 1350, sl: 1200, t1: 1800, t2: 2000, t3: null, allocation: "2%", horizon: "5-8 mos", status: "SL on weekly basis", isClosed: false },
+  { id: 28, name: "Nykaa", secId: "2350", seg: "NSE_EQ", date: "5 Nov 2026", entry: 345, cmp: 345, dipBuy: null, sl: 280, t1: 400, t2: 450, t3: null, allocation: "-", horizon: "-", status: "30% YoY GMV growth, margin expansion", isClosed: false },
+  { id: 29, name: "Motilal Oswal Fin", secId: "1476", seg: "NSE_EQ", date: "5 Nov 2026", entry: 1070, cmp: 1070, dipBuy: 950, sl: 750, t1: 1400, t2: 1650, t3: null, allocation: "3%", horizon: "8-12 mos", status: "Ascending triangle after 2 yrs consolidation", isClosed: false },
+  { id: 30, name: "KPIL (Kalpataru)", secId: "1724", seg: "NSE_EQ", date: "5 Nov 2026", entry: 1370, cmp: 1370, dipBuy: 1150, sl: 900, t1: 1850, t2: 2200, t3: null, allocation: "2-3% max", horizon: "8-10 mos", status: "Moderate trade", isClosed: false },
+  { id: 31, name: "Man Industries", secId: "2079", seg: "NSE_EQ", date: "11 Nov 2026", entry: 810, cmp: 810, dipBuy: null, sl: 550, t1: 1050, t2: 1300, t3: null, allocation: "2.5%", horizon: "5-8 mos", status: "Large-diameter line pipes; long-term holding (min 2-3 yrs)", isClosed: false },
+  { id: 32, name: "Ramkrishna Forgings", secId: "4932", seg: "NSE_EQ", date: "11 Nov 2026", entry: 750, cmp: 750, dipBuy: 625, sl: 500, t1: 1000, t2: 1250, t3: null, allocation: "3% max", horizon: "9-12 mos", status: "High volatility. Risks: geopolitics, shipping, energy prices", isClosed: false },
+  { id: 33, name: "Kalyan Jewellers", secId: "3051", seg: "NSE_EQ", date: "12 Nov 2026", entry: 710, cmp: 710, dipBuy: null, sl: 490, t1: 930, t2: 1150, t3: null, allocation: "2% max", horizon: "6-9 mos", status: "Inverse head & shoulders. High-volatility stock", isClosed: false },
+  { id: 34, name: "Aarti Pharmalabs", secId: "19830", seg: "NSE_EQ", date: "12 Nov 2026", entry: 1000, cmp: 1000, dipBuy: null, sl: 750, t1: 1250, t2: 1500, t3: null, allocation: "2.5% max", horizon: "6-9 mos", status: "Cup & handle pattern", isClosed: false },
+  { id: 35, name: "Union Bank of India", secId: "364", seg: "NSE_EQ", date: "13 Nov 2026", entry: 203, cmp: 203, dipBuy: 170, sl: 100, t1: 300, t2: 350, t3: null, allocation: "2.5% max", horizon: "Min 1 yr", status: "Inverse head & shoulders; long-term breakout", isClosed: false },
+  { id: 36, name: "Sambhv Steel Tubes", secId: "29400", seg: "NSE_EQ", date: "16 Nov 2026", entry: 165.5, cmp: 165.5, dipBuy: null, sl: 130, t1: 200, t2: 230, t3: null, allocation: "2% max", horizon: "5-8 mos", status: "Small cap, risky", isClosed: false },
+  { id: 37, name: "PI Industries", secId: "2692", seg: "NSE_EQ", date: "16 Nov 2026", entry: 1680, cmp: 1680, dipBuy: 1150, sl: null, t1: null, t2: null, t3: null, allocation: "1% x 3", horizon: "12-18 mos", status: "Mean-reversal: buy 1% each at 1,680 / 1,400 / 1,150. No SL or targets given", isClosed: false }
+];
+
+let stocks = JSON.parse(localStorage.getItem('equity_radar_dhan_v2')) || INITIAL_STOCKS;
+let thresholdPct = parseFloat(localStorage.getItem('equity_radar_thresh')) || 3.0;
+let dhanClientId = localStorage.getItem('dhan_client_id') || '1114314980';
+let dhanAccessToken = localStorage.getItem('dhan_access_token') || '';
+let currentFilter = 'active';
+let autoPollTimer = null;
+let isAutoPolling = true;
+let lastSyncStatus = dhanAccessToken ? "Ready for Dhan API" : "Enter Dhan Access Token in ⚙️";
+let triggeredAlerts = [];
+let notifiedKeys = new Set();
+
+document.getElementById('thresholdInput').value = thresholdPct;
+document.getElementById('settingClientId').value = dhanClientId;
+document.getElementById('settingAccessToken').value = dhanAccessToken;
+
+if ("Notification" in window && Notification.permission === "granted") {
+  document.getElementById('alertBanner').classList.add('hidden');
+}
+
+function saveState() {
+  localStorage.setItem('equity_radar_dhan_v2', JSON.stringify(stocks));
+  localStorage.setItem('equity_radar_thresh', thresholdPct);
+  localStorage.setItem('dhan_client_id', dhanClientId);
+  localStorage.setItem('dhan_access_token', dhanAccessToken);
+}
+
+function saveDhanCredentials() {
+  dhanClientId = document.getElementById('settingClientId').value.trim();
+  dhanAccessToken = document.getElementById('settingAccessToken').value.trim();
+  saveState();
+  closeSettingsModal();
+  fetchDhanPrices(true);
+}
+
+/* Quick Toggle: Mark Close / Reopen */
+function toggleCloseStatus(id) {
+  const s = stocks.find(x => x.id === id);
+  if (!s) return;
+  s.isClosed = !s.isClosed;
+  if (s.isClosed) {
+    s.status = `CLOSED by user on ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}. ${s.status}`;
+  } else {
+    s.status = `REOPENED by user. ${s.status}`;
+  }
+  saveState();
+  render();
+}
+
+/* DhanHQ REST API Integration */
+async function fetchDhanPrices(manual = false) {
+  if (!dhanAccessToken) {
+    lastSyncStatus = "Access Token missing (Set in ⚙️)";
+    render();
+    return;
+  }
+
+  const activeStocks = stocks.filter(s => !s.isClosed && s.secId);
+  if (activeStocks.length === 0) return;
+
+  lastSyncStatus = "Fetching Dhan quotes...";
+  render();
+
+  const nseIds = activeStocks.map(s => String(s.secId));
+  const payload = { "NSE_EQ": nseIds };
+
+  const targetUrl = "https://api.dhan.co/v2/marketfeed/ltp";
+  const proxyUrls = [
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
+    `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`
+  ];
+
+  let success = false;
+  const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  for (const proxy of proxyUrls) {
+    try {
+      const res = await fetch(proxy, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "client-id": dhanClientId,
+          "access-token": dhanAccessToken
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      
+      const ltpMap = data?.data?.["NSE_EQ"] || data?.data;
+      if (ltpMap && typeof ltpMap === 'object') {
+        let updatedCount = 0;
+        stocks.forEach(s => {
+          if (!s.isClosed && s.secId && ltpMap[s.secId]) {
+            const price = Number(ltpMap[s.secId]);
+            if (price > 0) {
+              s.cmp = price;
+              s.lastLiveSync = nowStr;
+              s.isLive = true;
+              updatedCount++;
+            }
+          }
+        });
+        lastSyncStatus = `Dhan Live (${updatedCount} stocks) • ${nowStr}`;
+        success = true;
+        break;
+      }
+    } catch (e) {}
+  }
+
+  if (!success) {
+    lastSyncStatus = manual ? `Dhan API error / CORS relay timeout` : `Using cached prices • ${nowStr}`;
+  } else {
+    saveState();
+    evaluateAllAlerts();
+  }
+  render();
+}
+
+function refreshDhanPrices(manual = false) {
+  fetchDhanPrices(manual);
+}
+
+function startAutoPoll() {
+  if (autoPollTimer) clearInterval(autoPollTimer);
+  isAutoPolling = true;
+  document.getElementById('autoPollBtn').classList.add('active');
+  document.getElementById('autoPollBtn').innerText = '● Auto 30s';
+  document.getElementById('liveDot').classList.remove('paused');
+  autoPollTimer = setInterval(() => fetchDhanPrices(false), 30000);
+}
+
+function toggleAutoPoll() {
+  if (isAutoPolling) {
+    clearInterval(autoPollTimer);
+    autoPollTimer = null;
+    isAutoPolling = false;
+    document.getElementById('autoPollBtn').classList.remove('active');
+    document.getElementById('autoPollBtn').innerText = '⏸ Paused';
+    document.getElementById('liveDot').classList.add('paused');
+  } else {
+    fetchDhanPrices(true);
+    startAutoPoll();
+  }
+}
+
+function updateThreshold() {
+  thresholdPct = parseFloat(document.getElementById('thresholdInput').value) || 3.0;
+  notifiedKeys.clear();
+  saveState();
+  evaluateAllAlerts();
+  render();
+}
+
+function requestAlertPermissions() {
+  playAlertTone('target');
+  if ("Notification" in window) {
+    Notification.requestPermission().then(perm => {
+      if (perm === "granted") {
+        document.getElementById('alertBanner').classList.add('hidden');
+        new Notification("Equity Radar Live", { body: "Dhan real-time proximity alerts are active." });
+      }
+    });
+  } else {
+    document.getElementById('alertBanner').classList.add('hidden');
+  }
+}
+
+function playAlertTone(type) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = type === 'sl' ? 'sawtooth' : 'sine';
+    osc.frequency.setValueAtTime(type === 'sl' ? 320 : 880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(type === 'sl' ? 180 : 1174, ctx.currentTime + 0.25);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.3);
+  } catch (e) {}
+}
+
+function getAlertState(s) {
+  if (s.isClosed || !s.cmp) return { type: 'none', label: '' };
+  const cmp = s.cmp;
+  const thresh = thresholdPct / 100;
+
+  if (s.sl) {
+    const distSl = (cmp - s.sl) / s.sl;
+    if (cmp <= s.sl) return { type: 'sl', label: `🛑 SL HIT (₹${s.sl})` };
+    if (distSl <= thresh) return { type: 'sl', label: `⚠️ ${(distSl * 100).toFixed(1)}% FROM SL` };
+  }
+
+  const targets = [
+    { name: 'T1', val: s.t1 },
+    { name: 'T2', val: s.t2 },
+    { name: 'T3', val: s.t3 }
+  ].filter(t => t.val);
+
+  for (let i = targets.length - 1; i >= 0; i--) {
+    const t = targets[i];
+    if (cmp >= t.val) return { type: 'target', label: `🎯 ${t.name} HIT (₹${t.val})` };
+    const distT = (t.val - cmp) / t.val;
+    if (distT <= thresh) return { type: 'target', label: `🔥 ${(distT * 100).toFixed(1)}% TO ${t.name}` };
+  }
+
+  if (s.dipBuy && cmp <= s.dipBuy * (1 + thresh)) {
+    return { type: 'dip', label: `📉 IN DIP ZONE (≤₹${s.dipBuy})` };
+  }
+
+  return { type: 'none', label: '' };
+}
+
+function triggerNotification(stock, alertObj) {
+  const key = `${stock.id}_${alertObj.label}`;
+  if (notifiedKeys.has(key)) return;
+  notifiedKeys.add(key);
+
+  const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  triggeredAlerts.unshift({ name: stock.name, cmp: stock.cmp, label: alertObj.label, type: alertObj.type, time });
+  if (triggeredAlerts.length > 15) triggeredAlerts.pop();
+
+  playAlertTone(alertObj.type);
+  if (navigator.vibrate) navigator.vibrate(alertObj.type === 'sl' ? [250, 100, 250] : [150, 80, 150]);
+
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification(`${stock.name}: ${alertObj.label}`, {
+      body: `Dhan CMP: ₹${stock.cmp} | Entry: ₹${stock.entry} | SL: ₹${stock.sl || 'N/A'} | T1: ₹${stock.t1 || 'N/A'}`
+    });
+  }
+}
+
+function evaluateAllAlerts() {
+  stocks.forEach(s => {
+    const state = getAlertState(s);
+    if (state.type === 'target' || state.type === 'sl') {
+      triggerNotification(s, state);
+    }
+  });
+}
+
+function updateCmp(id, val) {
+  const num = parseFloat(val);
+  if (isNaN(num) || num <= 0) return;
+  const s = stocks.find(x => x.id === id);
+  if (s) {
+    s.cmp = num;
+    s.isLive = false;
+    saveState();
+    const state = getAlertState(s);
+    if (state.type !== 'none') triggerNotification(s, state);
+    render();
+  }
+}
+
+function setFilter(f, el) {
+  currentFilter = f;
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
+function clearAlerts() {
+  triggeredAlerts = [];
+  notifiedKeys.clear();
+  render();
+}
+
+/* Add / Edit Modal Logic */
+function openFormModal(id = null) {
+  const modal = document.getElementById('formModal');
+  const delBtn = document.getElementById('deleteStockBtn');
+  if (id) {
+    const s = stocks.find(x => x.id === id);
+    if (!s) return;
+    document.getElementById('formModalTitle').innerText = 'Edit Stock Call';
+    document.getElementById('editStockId').value = s.id;
+    document.getElementById('fName').value = s.name;
+    document.getElementById('fSecId').value = s.secId || '';
+    document.getElementById('fDate').value = s.date || '';
+    document.getElementById('fClosed').value = String(Boolean(s.isClosed));
+    document.getElementById('fEntry').value = s.entry || '';
+    document.getElementById('fCmp').value = s.cmp || '';
+    document.getElementById('fSl').value = s.sl || '';
+    document.getElementById('fDip').value = s.dipBuy || '';
+    document.getElementById('fT1').value = s.t1 || '';
+    document.getElementById('fT2').value = s.t2 || '';
+    document.getElementById('fT3').value = s.t3 || '';
+    document.getElementById('fHorizon').value = s.horizon && s.horizon !== '-' ? s.horizon : '';
+    document.getElementById('fStatus').value = s.status || '';
+    delBtn.classList.remove('hidden');
+  } else {
+    document.getElementById('formModalTitle').innerText = 'Add New Stock Call';
+    document.getElementById('editStockId').value = '';
+    document.getElementById('fName').value = '';
+    document.getElementById('fSecId').value = '';
+    document.getElementById('fDate').value = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    document.getElementById('fClosed').value = 'false';
+    document.getElementById('fEntry').value = '';
+    document.getElementById('fCmp').value = '';
+    document.getElementById('fSl').value = '';
+    document.getElementById('fDip').value = '';
+    document.getElementById('fT1').value = '';
+    document.getElementById('fT2').value = '';
+    document.getElementById('fT3').value = '';
+    document.getElementById('fHorizon').value = '';
+    document.getElementById('fStatus').value = '';
+    delBtn.classList.add('hidden');
+  }
+  modal.classList.remove('hidden');
+}
+
+function closeFormModal() { document.getElementById('formModal').classList.add('hidden'); }
+
+function saveStockForm() {
+  const idVal = document.getElementById('editStockId').value;
+  const name = document.getElementById('fName').value.trim();
+  const secId = document.getElementById('fSecId').value.trim();
+  const entry = parseFloat(document.getElementById('fEntry').value);
+  if (!name || isNaN(entry)) return alert("Please enter Stock Name and Entry Price.");
+
+  const cmpVal = parseFloat(document.getElementById('fCmp').value);
+  const payload = {
+    name,
+    secId,
+    seg: "NSE_EQ",
+    date: document.getElementById('fDate').value.trim() || new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+    isClosed: document.getElementById('fClosed').value === 'true',
+    entry,
+    cmp: isNaN(cmpVal) ? entry : cmpVal,
+    sl: parseFloat(document.getElementById('fSl').value) || null,
+    dipBuy: parseFloat(document.getElementById('fDip').value) || null,
+    t1: parseFloat(document.getElementById('fT1').value) || null,
+    t2: parseFloat(document.getElementById('fT2').value) || null,
+    t3: parseFloat(document.getElementById('fT3').value) || null,
+    allocation: "Custom",
+    horizon: document.getElementById('fHorizon').value.trim() || "-",
+    status: document.getElementById('fStatus').value.trim() || "Added on mobile"
+  };
+
+  if (idVal) {
+    const idx = stocks.findIndex(x => x.id === Number(idVal));
+    if (idx !== -1) stocks[idx] = { ...stocks[idx], ...payload };
+  } else {
+    stocks.unshift({ id: Date.now(), ...payload });
+  }
+
+  saveState();
+  closeFormModal();
+  fetchDhanPrices(true);
+}
+
+function deleteStock() {
+  const idVal = Number(document.getElementById('editStockId').value);
+  if (!idVal) return;
+  if (confirm("Delete this stock call?")) {
+    stocks = stocks.filter(x => x.id !== idVal);
+    saveState();
+    closeFormModal();
+    render();
+  }
+}
+
+/* Settings & Backup Logic */
+function openSettingsModal() { document.getElementById('settingsModal').classList.remove('hidden'); }
+function closeSettingsModal() { document.getElementById('settingsModal').classList.add('hidden'); }
+
+function exportBackup() {
+  const blob = new Blob([JSON.stringify(stocks, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `equity_calls_dhan_backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importBackup(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      if (Array.isArray(parsed)) {
+        stocks = parsed;
+        saveState();
+        closeSettingsModal();
+        fetchDhanPrices(true);
+        alert(`Imported ${stocks.length} stock calls successfully!`);
+      } else {
+        alert("Invalid backup file format.");
+      }
+    } catch (err) {
+      alert("Error reading JSON file.");
+    }
+  };
+  reader.readAsText(file);
+}
+
+function resetToDefault() {
+  if (confirm("Reset watchlist back to original 37 calls?")) {
+    stocks = JSON.parse(JSON.stringify(INITIAL_STOCKS));
+    saveState();
+    closeSettingsModal();
+    fetchDhanPrices(true);
+  }
+}
+
+function render() {
+  const query = document.getElementById('searchInput').value.toLowerCase();
+  const listEl = document.getElementById('stockList');
+
+  const activeCount = stocks.filter(s => !s.isClosed).length;
+  const closedCount = stocks.filter(s => s.isClosed).length;
+  const targetCount = stocks.filter(s => !s.isClosed && getAlertState(s).type === 'target').length;
+  const slCount = stocks.filter(s => !s.isClosed && getAlertState(s).type === 'sl').length;
+  const dipCount = stocks.filter(s => !s.isClosed && getAlertState(s).type === 'dip').length;
+
+  document.getElementById('summarySubtitle').innerText = `${activeCount} Active • ${lastSyncStatus}`;
+  document.getElementById('cntActive').innerText = activeCount;
+  document.getElementById('cntClosed').innerText = closedCount;
+  document.getElementById('cntTarget').innerText = targetCount;
+  document.getElementById('cntSl').innerText = slCount;
+  document.getElementById('cntDip').innerText = dipCount;
+  document.getElementById('cntAll').innerText = stocks.length;
+
+  const drawer = document.getElementById('alertsDrawer');
+  const alertsList = document.getElementById('alertsList');
+  if (triggeredAlerts.length > 0) {
+    drawer.style.display = 'block';
+    alertsList.innerHTML = triggeredAlerts.slice(0, 5).map(a => `
+      <div class="alert-item">
+        <span><strong>${a.name}</strong> (₹${a.cmp}) — <span style="color:${a.type === 'sl' ? 'var(--red)' : 'var(--green)'}">${a.label}</span></span>
+        <span style="color:var(--muted)">${a.time}</span>
+      </div>
+    `).join('');
+  } else {
+    drawer.style.display = 'none';
+  }
+
+  const filtered = stocks.filter(s => {
+    if (query && !s.name.toLowerCase().includes(query) && !(s.secId || '').toLowerCase().includes(query) && !s.status.toLowerCase().includes(query)) return false;
+    const alertState = getAlertState(s);
+    if (currentFilter === 'active') return !s.isClosed;
+    if (currentFilter === 'closed') return s.isClosed;
+    if (currentFilter === 'near_target') return !s.isClosed && alertState.type === 'target';
+    if (currentFilter === 'near_sl') return !s.isClosed && alertState.type === 'sl';
+    if (currentFilter === 'near_dip') return !s.isClosed && alertState.type === 'dip';
+    return true;
+  });
+
+  listEl.innerHTML = filtered.map(s => {
+    const alertState = getAlertState(s);
+    const pnlPct = s.entry ? (((s.cmp - s.entry) / s.entry) * 100).toFixed(1) : 0;
+    const pnlClass = pnlPct >= 0 ? 'pos' : 'neg';
+    const pnlSign = pnlPct >= 0 ? '+' : '';
+
+    const lowBound = s.sl || s.entry * 0.7;
+    const highBound = (s.t1 && s.cmp > s.t1 && s.t2) ? s.t2 : (s.t1 || s.entry * 1.3);
+    const pctPos = Math.max(0, Math.min(100, ((s.cmp - lowBound) / (highBound - lowBound)) * 100));
+    const barColor = alertState.type === 'sl' ? 'var(--red)' : (alertState.type === 'target' ? 'var(--green)' : 'var(--blue)');
+
+    let badgeHtml = '';
+    if (s.isClosed) badgeHtml = `<span class="badge badge-closed">Closed</span>`;
+    else if (alertState.type === 'target') badgeHtml = `<span class="badge badge-target">${alertState.label}</span>`;
+    else if (alertState.type === 'sl') badgeHtml = `<span class="badge badge-sl">${alertState.label}</span>`;
+    else if (alertState.type === 'dip') badgeHtml = `<span class="badge badge-dip">${alertState.label}</span>`;
+
+    const closeBtnHtml = s.isClosed
+      ? `<button class="mini-btn reopen-action" onclick="toggleCloseStatus(${s.id})">📂 Reopen Call</button>`
+      : `<button class="mini-btn close-action" onclick="toggleCloseStatus(${s.id})">❌ Mark as Closed</button>`;
+
+    return `
+      <div class="card ${s.isClosed ? 'closed' : ''} ${alertState.type === 'target' ? 'near-target' : ''} ${alertState.type === 'sl' ? 'near-sl' : ''} ${alertState.type === 'dip' ? 'near-dip' : ''}">
+        <div class="card-top">
+          <div>
+            <div class="stock-name">${s.name}<span class="ticker-tag">ID: ${s.secId || 'N/A'}</span></div>
+            <div class="stock-meta">${s.date} • ${s.horizon}</div>
+          </div>
+          ${badgeHtml}
+        </div>
+
+        <div class="price-bar">
+          <div class="cmp-group">
+            <span class="cmp-label">CMP ₹</span>
+            <input class="cmp-input" type="number" step="0.5" value="${s.cmp}" onchange="updateCmp(${s.id}, this.value)" />
+            <span class="live-tag ${s.isLive ? '' : 'stale'}">${s.isLive ? 'DHAN' : 'MANUAL'}</span>
+          </div>
+          <div class="pnl ${pnlClass}">${pnlSign}${pnlPct}% vs Entry (₹${s.entry})</div>
+        </div>
+
+        <div class="levels">
+          <div class="lvl-box">
+            <span class="lvl-lbl">Stop Loss</span>
+            <span class="lvl-val c-sl">${s.sl ? '₹' + s.sl : '-'}</span>
+          </div>
+          <div class="lvl-box">
+            <span class="lvl-lbl">Dip Buy</span>
+            <span class="lvl-val">${s.dipBuy ? '₹' + s.dipBuy : '-'}</span>
+          </div>
+          <div class="lvl-box">
+            <span class="lvl-lbl">Target 1</span>
+            <span class="lvl-val c-t1">${s.t1 ? '₹' + s.t1 : '-'}</span>
+          </div>
+          <div class="lvl-box">
+            <span class="lvl-lbl">Target 2/3</span>
+            <span class="lvl-val c-t2">${s.t2 ? '₹' + s.t2 : '-'}${s.t3 ? ' / ' + s.t3 : ''}</span>
+          </div>
+        </div>
+
+        ${(s.sl && s.t1) ? `
+        <div class="range-wrap">
+          <div class="range-track"><div class="range-fill" style="width:${pctPos}%; background:${barColor};"></div></div>
+          <div class="range-labels"><span>SL ₹${s.sl}</span><span>Entry ₹${s.entry}</span><span>Target ₹${highBound}</span></div>
+        </div>` : ''}
+
+        <div class="status-note">${s.status}</div>
+        <div class="card-footer">
+          <span class="sync-time">${s.lastLiveSync ? 'Synced: ' + s.lastLiveSync : 'Set Token in ⚙️'}</span>
+          <div class="card-actions">
+            ${closeBtnHtml}
+            <button class="mini-btn" onclick="openFormModal(${s.id})">✏️ Edit</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+render();
+if (dhanAccessToken) {
+  fetchDhanPrices(true);
+  startAutoPoll();
+} else {
+  setTimeout(() => openSettingsModal(), 600);
+}
+</script>
+</body>
+</html>
